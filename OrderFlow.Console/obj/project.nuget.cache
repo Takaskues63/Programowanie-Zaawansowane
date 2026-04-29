@@ -1,0 +1,13 @@
+{
+  "version": 2,
+  "dgSpecHash": "Vq61ZzPCOgY=",
+  "success": true,
+  "projectFilePath": "C:\\Users\\foxyk\\Downloads\\Programowanie-Zaawansowane-main\\OrderFlow\\OrderFlow.Console\\OrderFlow.Console.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\foxyk\\.nuget\\packages\\microsoft.netcore.app.ref\\9.0.15\\microsoft.netcore.app.ref.9.0.15.nupkg.sha512",
+    "C:\\Users\\foxyk\\.nuget\\packages\\microsoft.windowsdesktop.app.ref\\9.0.15\\microsoft.windowsdesktop.app.ref.9.0.15.nupkg.sha512",
+    "C:\\Users\\foxyk\\.nuget\\packages\\microsoft.aspnetcore.app.ref\\9.0.15\\microsoft.aspnetcore.app.ref.9.0.15.nupkg.sha512",
+    "C:\\Users\\foxyk\\.nuget\\packages\\microsoft.netcore.app.host.win-x64\\9.0.15\\microsoft.netcore.app.host.win-x64.9.0.15.nupkg.sha512"
+  ],
+  "logs": []
+}
