@@ -20,4 +20,12 @@ public class Customer
     [JsonPropertyName("isVip")]
     [XmlElement("IsVip")]
     public bool IsVip { get; set; }
+
+    [JsonPropertyName("email")]
+    [XmlElement("Email")]
+    public string? Email { get; set; }
+
+    [JsonIgnore]
+    [XmlIgnore]
+    public List<Order> Orders { get; set; } = new();
 }

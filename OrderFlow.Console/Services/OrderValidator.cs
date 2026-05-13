@@ -7,7 +7,6 @@ public delegate bool ValidationRule(Order order, out string errorMessage);
 public class OrderValidator
 {
     private readonly List<ValidationRule> _customRules = new();
-
     private readonly List<(Func<Order, bool> Rule, string ErrorMessage)> _funcRules = new();
 
     public OrderValidator()

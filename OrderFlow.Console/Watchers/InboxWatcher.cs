@@ -7,12 +7,12 @@ namespace OrderFlow.Console.Watchers;
 
 public class InboxWatcher : IDisposable
 {
-    private readonly FileSystemWatcher  _watcher;
-    private readonly OrderPipeline      _pipeline;
-    private readonly SemaphoreSlim      _semaphore = new(2);
-    private readonly string             _inboxPath;
-    private readonly HashSet<string>    _processedFiles = new();
-    private readonly object             _hashLock = new();
+    private readonly FileSystemWatcher _watcher;
+    private readonly OrderPipeline     _pipeline;
+    private readonly SemaphoreSlim     _semaphore = new(2);
+    private readonly string            _inboxPath;
+    private readonly HashSet<string>   _processedFiles = new();
+    private readonly object            _hashLock = new();
 
     private static readonly JsonSerializerOptions _jsonOptions = new()
     {

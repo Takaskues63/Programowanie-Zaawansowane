@@ -5,22 +5,22 @@ namespace OrderFlow.Console.Services;
 
 public class OrderStatisticsUnsafe
 {
-    public int    TotalProcessed { get; private set; }
-    public decimal TotalRevenue  { get; private set; }
+    public int     TotalProcessed { get; private set; }
+    public decimal TotalRevenue   { get; private set; }
     public Dictionary<OrderStatus, int> OrdersPerStatus { get; } = new();
     public List<string> ProcessingErrors                { get; } = new();
 
     public void Record(Order order)
     {
-        TotalProcessed++;                           
-        TotalRevenue += order.TotalAmount;          
+        TotalProcessed++;
+        TotalRevenue += order.TotalAmount;
 
         if (!OrdersPerStatus.ContainsKey(order.Status))
             OrdersPerStatus[order.Status] = 0;
-        OrdersPerStatus[order.Status]++;           
+        OrdersPerStatus[order.Status]++;
 
         if (order.Items.Count == 0)
-            ProcessingErrors.Add($"#{order.Id}: brak pozycji"); 
+            ProcessingErrors.Add($"#{order.Id}: brak pozycji");
     }
 
     public void PrintSummary(string label)
@@ -44,7 +44,6 @@ public class OrderStatistics
     public decimal TotalRevenue { get { lock (_lock) return _totalRevenue; } }
 
     public ConcurrentDictionary<OrderStatus, int> OrdersPerStatus { get; } = new();
-
     public List<string> ProcessingErrors { get; } = new();
 
     public void Record(Order order)
@@ -60,8 +59,8 @@ public class OrderStatistics
         }
 
         OrdersPerStatus.AddOrUpdate(
-            key:            order.Status,
-            addValue:       1,
+            key:                order.Status,
+            addValue:           1,
             updateValueFactory: (_, old) => old + 1);
     }
 

@@ -20,4 +20,12 @@ public class Product
     [JsonPropertyName("category")]
     [XmlElement("Category")]
     public string Category { get; set; } = string.Empty;
+
+    [JsonIgnore]
+    [XmlIgnore]
+    public int Stock { get; set; } = 10;
+
+    [JsonIgnore]
+    [XmlIgnore]
+    public List<OrderItem> OrderItems { get; set; } = new();
 }

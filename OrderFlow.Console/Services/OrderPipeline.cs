@@ -22,8 +22,7 @@ public class OrderPipeline
         System.Console.WriteLine($"\n>>> Zamówienie #{order.Id} ({order.Customer.Name}) — start pipeline");
 
         bool isValid = _validator.ValidateAll(order, out var errors);
-        ValidationCompleted?.Invoke(
-            this, new OrderValidationEventArgs(order, isValid, errors));
+        ValidationCompleted?.Invoke(this, new OrderValidationEventArgs(order, isValid, errors));
 
         if (!isValid)
         {

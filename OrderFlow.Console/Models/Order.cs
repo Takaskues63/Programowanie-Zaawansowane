@@ -10,6 +10,10 @@ public class Order
     [XmlAttribute("id")]
     public int Id { get; set; }
 
+    [JsonIgnore]
+    [XmlIgnore]
+    public int CustomerId { get; set; }
+
     [JsonPropertyName("customer")]
     [XmlElement("Customer")]
     public required Customer Customer { get; set; }
@@ -21,6 +25,10 @@ public class Order
     [JsonPropertyName("status")]
     [XmlElement("Status")]
     public OrderStatus Status { get; set; } = OrderStatus.New;
+
+    [JsonPropertyName("notes")]
+    [XmlElement("Notes")]
+    public string? Notes { get; set; }
 
     [JsonPropertyName("items")]
     [XmlArray("Items")]

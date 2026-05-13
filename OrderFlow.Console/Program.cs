@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Microsoft.EntityFrameworkCore;
 using OrderFlow.Console.Data;
 using OrderFlow.Console.Events;
 using OrderFlow.Console.Models;
@@ -46,13 +47,13 @@ Section("Zadanie 3 — Action / Func / Predicate");
 
 var processor = new OrderProcessor(orders);
 
-Predicate<Order> isVipOrder   = o => o.Customer.IsVip;
-Predicate<Order> isHighValue  = o => o.TotalAmount > 1000m;
-Predicate<Order> isNewOrder   = o => o.Status == OrderStatus.New;
+Predicate<Order> isVipOrder  = o => o.Customer.IsVip;
+Predicate<Order> isHighValue = o => o.TotalAmount > 1000m;
+Predicate<Order> isNewOrder  = o => o.Status == OrderStatus.New;
 
-var vipOrders   = processor.FilterOrders(isVipOrder);
-var highOrders  = processor.FilterOrders(isHighValue);
-var newOrders   = processor.FilterOrders(isNewOrder);
+var vipOrders  = processor.FilterOrders(isVipOrder);
+var highOrders = processor.FilterOrders(isHighValue);
+var newOrders  = processor.FilterOrders(isNewOrder);
 
 System.Console.WriteLine($"Zamówienia VIP:          {vipOrders.Count()}");
 System.Console.WriteLine($"Zamówienia > 1000 zł:   {highOrders.Count()}");
@@ -171,7 +172,7 @@ pipeline.StatusChanged += (_, e) =>
             $"  [EMAIL] Info o anulacji wysłane do: {e.Order.Customer.Name}");
 };
 
-int completedLive  = 0;
+int completedLive   = 0;
 decimal revenueLive = 0m;
 pipeline.StatusChanged += (_, e) =>
 {
@@ -344,3 +345,248 @@ for (int wave = 1; wave <= 2; wave++)
 
 await Task.Delay(2000);
 System.Console.WriteLine("\n  [DEMO] Koniec demonstracji watchera.");
+
+
+Header("LABORATORIUM 4 — Baza danych (EF Core + SQLite)");
+
+Section("Zadanie 1 — DbContext, migracje, seeding");
+
+await using var db = new OrderFlowContext();
+await db.Database.MigrateAsync();
+await DatabaseSeeder.SeedAsync(db);
+System.Console.WriteLine("  ✓ Baza danych gotowa i zaseedowana");
+
+var productCount  = await db.Products.CountAsync();
+var customerCount = await db.Customers.CountAsync();
+var orderCount    = await db.Orders.CountAsync();
+System.Console.WriteLine($"  Produkty:   {productCount}");
+System.Console.WriteLine($"  Klienci:    {customerCount}");
+System.Console.WriteLine($"  Zamówienia: {orderCount}");
+
+Section("Zadanie 2 — Seeding i CRUD");
+
+System.Console.WriteLine("\n[CREATE] Dodaję nowe zamówienie...");
+await using (var dbCreate = new OrderFlowContext())
+{
+    var customer  = await dbCreate.Customers.FirstAsync();
+    var products2 = await dbCreate.Products.Take(2).ToListAsync();
+
+    var newOrder = new Order
+    {
+        CustomerId = customer.Id,
+        Customer   = customer,
+        OrderDate  = DateTime.Now,
+        Status     = OrderStatus.New,
+        Notes      = "Zamówienie testowe CRUD",
+        Items =
+        {
+            new() { ProductId = products2[0].Id, Product = products2[0],
+                    Quantity = 1, UnitPrice = products2[0].Price },
+            new() { ProductId = products2[1].Id, Product = products2[1],
+                    Quantity = 3, UnitPrice = products2[1].Price }
+        }
+    };
+
+    dbCreate.Orders.Add(newOrder);
+    await dbCreate.SaveChangesAsync();
+    System.Console.WriteLine($"  ✓ Dodano zamówienie #{newOrder.Id} z {newOrder.Items.Count} pozycjami");
+}
+
+System.Console.WriteLine("\n[READ] Pobieranie zamówień z Include...");
+await using (var dbRead = new OrderFlowContext())
+{
+    var readOrders = await dbRead.Orders
+        .Include(o => o.Customer)
+        .Include(o => o.Items)
+            .ThenInclude(i => i.Product)
+        .OrderBy(o => o.Id)
+        .ToListAsync();
+
+    foreach (var o in readOrders)
+    {
+        System.Console.WriteLine($"  #{o.Id}  {o.Customer.Name,-20}  {o.Status,-12}  " +
+            $"{o.Items.Sum(i => i.UnitPrice * i.Quantity):C}");
+        foreach (var item in o.Items)
+            System.Console.WriteLine($"       └ {item.Product.Name,-20} x{item.Quantity}  {item.UnitPrice:C}");
+    }
+}
+
+System.Console.WriteLine("\n[UPDATE] Zmiana statusu New → Processing...");
+await using (var dbUpdate = new OrderFlowContext())
+{
+    var orderToUpdate = await dbUpdate.Orders
+        .FirstOrDefaultAsync(o => o.Status == OrderStatus.New);
+
+    if (orderToUpdate != null)
+    {
+        orderToUpdate.Status = OrderStatus.Processing;
+        orderToUpdate.Notes  = "Zaktualizowano przez CRUD demo";
+        await dbUpdate.SaveChangesAsync();
+        System.Console.WriteLine($"  ✓ Zamówienie #{orderToUpdate.Id} → Processing, Notes zaktualizowane");
+    }
+}
+
+System.Console.WriteLine("\n[DELETE] Usuwanie zamówienia Cancelled...");
+await using (var dbDelete = new OrderFlowContext())
+{
+    var orderToDelete = await dbDelete.Orders
+        .FirstOrDefaultAsync(o => o.Status == OrderStatus.Cancelled);
+
+    if (orderToDelete != null)
+    {
+        dbDelete.Orders.Remove(orderToDelete);
+        await dbDelete.SaveChangesAsync();
+        System.Console.WriteLine($"  ✓ Zamówienie #{orderToDelete.Id} (Cancelled) usunięte");
+    }
+}
+
+System.Console.WriteLine("\n[DELETE Restrict] Próba usunięcia klienta z zamówieniami...");
+await using (var dbRestrict = new OrderFlowContext())
+{
+    var customerWithOrders = await dbRestrict.Customers
+        .Include(c => c.Orders)
+        .FirstOrDefaultAsync(c => c.Orders.Any());
+
+    if (customerWithOrders != null)
+    {
+        try
+        {
+            dbRestrict.Customers.Remove(customerWithOrders);
+            await dbRestrict.SaveChangesAsync();
+            System.Console.WriteLine("  ✗ Usunięto — nieoczekiwane!");
+        }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"  ✓ Wyjątek zgodnie z oczekiwaniem (Restrict): {ex.GetType().Name}");
+        }
+    }
+}
+
+Section("Zadanie 3 — Zapytania LINQ i transakcje");
+
+await using var dbQ = new OrderFlowContext();
+
+System.Console.WriteLine("\n[1] Zamówienia klientów VIP > 500 zł:");
+var vipOrders2 = await dbQ.Orders
+    .Include(o => o.Customer)
+    .Include(o => o.Items)
+    .Where(o => o.Customer.IsVip)
+    .Select(o => new
+    {
+        o.Id,
+        Customer = o.Customer.Name,
+        Total    = o.Items.Sum(i => i.UnitPrice * i.Quantity)
+    })
+    .Where(x => x.Total > 500m)
+    .OrderByDescending(x => x.Total)
+    .ToListAsync();
+
+foreach (var x in vipOrders2)
+    System.Console.WriteLine($"  #{x.Id}  {x.Customer,-20}  {x.Total:C}");
+
+System.Console.WriteLine("\n[2] Ranking klientów wg łącznej wartości zamówień:");
+var ranking = await dbQ.Orders
+    .Include(o => o.Customer)
+    .Include(o => o.Items)
+    .GroupBy(o => new { o.Customer.Id, o.Customer.Name })
+    .Select(g => new
+    {
+        g.Key.Name,
+        Total = g.Sum(o => o.Items.Sum(i => i.UnitPrice * i.Quantity)),
+        Count = g.Count()
+    })
+    .OrderByDescending(x => x.Total)
+    .ToListAsync();
+
+foreach (var x in ranking)
+    System.Console.WriteLine($"  {x.Name,-20}  {x.Total:C}  ({x.Count} zamówień)");
+
+System.Console.WriteLine("\n[3] Średnia wartość zamówienia per miasto:");
+var byCity = await dbQ.Orders
+    .Include(o => o.Customer)
+    .Include(o => o.Items)
+    .GroupBy(o => o.Customer.City)
+    .Select(g => new
+    {
+        City = g.Key,
+        Avg  = g.Average(o => o.Items.Sum(i => i.UnitPrice * i.Quantity))
+    })
+    .OrderByDescending(x => x.Avg)
+    .ToListAsync();
+
+foreach (var x in byCity)
+    System.Console.WriteLine($"  {x.City,-12}  avg: {x.Avg:C}");
+
+System.Console.WriteLine("\n[4] Produkty nigdy nie zamówione:");
+var neverOrdered = await dbQ.Products
+    .Where(p => !p.OrderItems.Any())
+    .Select(p => new { p.Name, p.Category })
+    .ToListAsync();
+
+if (neverOrdered.Any())
+    foreach (var p in neverOrdered)
+        System.Console.WriteLine($"  {p.Name,-20}  {p.Category}");
+else
+    System.Console.WriteLine("  (wszystkie produkty były zamawiane)");
+
+System.Console.WriteLine("\n[5] Dynamiczne zapytanie (status: New, min kwota: 500 zł):");
+OrderStatus? filterStatus  = OrderStatus.New;
+decimal      filterMinAmount = 500m;
+
+IQueryable<Order> dynamicQuery = dbQ.Orders
+    .Include(o => o.Customer)
+    .Include(o => o.Items);
+
+if (filterStatus.HasValue)
+    dynamicQuery = dynamicQuery.Where(o => o.Status == filterStatus.Value);
+
+var dynamicResult = await dynamicQuery
+    .Select(o => new
+    {
+        o.Id,
+        Customer = o.Customer.Name,
+        o.Status,
+        Total = o.Items.Sum(i => i.UnitPrice * i.Quantity)
+    })
+    .Where(x => x.Total >= filterMinAmount)
+    .OrderByDescending(x => x.Total)
+    .ToListAsync();
+
+foreach (var x in dynamicResult)
+    System.Console.WriteLine($"  #{x.Id}  {x.Customer,-20}  {x.Status,-12}  {x.Total:C}");
+
+Section("Zadanie 3 — Transakcje");
+
+var orderService = new OrderService();
+
+System.Console.WriteLine("\n[SUKCES] Przetwarzanie zamówienia New z wystarczającym stanem:");
+await using (var dbTx1 = new OrderFlowContext())
+{
+    var newOrder = await dbTx1.Orders.FirstOrDefaultAsync(o => o.Status == OrderStatus.New);
+    if (newOrder != null)
+    {
+        try { await orderService.ProcessOrderAsync(dbTx1, newOrder.Id); }
+        catch { }
+    }
+}
+
+System.Console.WriteLine("\n[BŁĄD] Przetwarzanie zamówienia z zerowym stanem magazynowym:");
+await using (var dbTx2 = new OrderFlowContext())
+{
+    var newOrder = await dbTx2.Orders
+        .Include(o => o.Items).ThenInclude(i => i.Product)
+        .FirstOrDefaultAsync(o => o.Status == OrderStatus.New);
+
+    if (newOrder != null)
+    {
+        foreach (var item in newOrder.Items)
+            item.Product.Stock = 0;
+        await dbTx2.SaveChangesAsync();
+
+        try { await orderService.ProcessOrderAsync(dbTx2, newOrder.Id); }
+        catch (Exception ex)
+        {
+            System.Console.WriteLine($"  Wyjątek przechwycony w Program.cs: {ex.Message}");
+        }
+    }
+}

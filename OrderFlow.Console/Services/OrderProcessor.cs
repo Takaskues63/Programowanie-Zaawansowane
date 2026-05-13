@@ -24,7 +24,7 @@ public class OrderProcessor
         => aggregator(_orders);
 
     public void ProcessPipeline(
-        Predicate<Order>    filter,
+        Predicate<Order>     filter,
         Func<Order, decimal> sortKey,
         int                  topN,
         Action<Order>        finalAction)
