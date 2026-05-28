@@ -590,3 +590,35 @@ await using (var dbTx2 = new OrderFlowContext())
         }
     }
 }
+
+Header("LABORATORIUM 5 — CurrencyService (NBP API)");
+
+Section("Zadanie 3 — ConvertOrderTotal (przykładowe użycie)");
+
+var httpClient      = new HttpClient { BaseAddress = new Uri("https://api.nbp.pl") };
+var currencyService = new CurrencyService(httpClient);
+var converter       = new OrderCurrencyConverter(currencyService);
+
+await using var dbCurr = new OrderFlowContext();
+var ordersForConversion = await dbCurr.Orders
+    .Include(o => o.Customer)
+    .Include(o => o.Items)
+    .Take(3)
+    .ToListAsync();
+
+System.Console.WriteLine("\n  TotalAmount w PLN, USD i EUR:");
+foreach (var o in ordersForConversion)
+{
+    var totalPln = o.Items.Sum(i => i.UnitPrice * i.Quantity);
+    try
+    {
+        var totalUsd = await converter.ConvertOrderTotalAsync(o, "USD");
+        var totalEur = await converter.ConvertOrderTotalAsync(o, "EUR");
+        System.Console.WriteLine(
+            $"  #{o.Id}  {o.Customer.Name,-20}  PLN: {totalPln:C}  USD: {totalUsd:F2}  EUR: {totalEur:F2}");
+    }
+    catch (CurrencyServiceException ex)
+    {
+        System.Console.WriteLine($"  #{o.Id}  Błąd kursu: {ex.Message}");
+    }
+}
